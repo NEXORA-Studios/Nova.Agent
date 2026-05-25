@@ -83,9 +83,11 @@ Starting → Running → Stopping → Stopped
 
 快速示例（创建实例）：
 
-```json
-→ {"CreateInstance":{"java_path":"java","jvm_args":["-Xmx2G"],"jar_path":"server.jar","program_args":["nogui"],"working_dir":null,"id":null}}
-← {"OkData":{"InstanceId":"a1b2c3d4-..."}}
+```json5
+// 发送 Piped 信息
+{"CreateInstance":{"java_path":"java","jvm_args":["-Xmx2G"],"jar_path":"server.jar","program_args":["nogui"],"working_dir":null,"id":null}}
+// 接收 Piped 信息
+{"OkData":{"InstanceId":"a1b2c3d4-..."}}
 ```
 
 ## 日志
@@ -104,5 +106,5 @@ cargo build --release
 
 ## License
 
-Copyright (c) 2026 NEXORA Studios
+Copyright (c) 2026 NEXORA Studios\
 OpenSource under GNU Affero General Public License v3.0
