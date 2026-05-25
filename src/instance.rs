@@ -207,6 +207,13 @@ impl InstanceManager {
             let reader = BufReader::new(stdout);
             let mut lines = reader.lines();
             while let Ok(Some(line)) = lines.next_line().await {
+                // 检测 Minecraft 启动完成标志：Done (<任意内容>)! For help, type "help"
+                if *state_stdout.read().await == InstanceState::Starting {
+                    if line.contains("Done (") && line.contains(")! For help, type \"help\"") {
+                        *state_stdout.write().await = InstanceState::Running;
+                        tracing::info!("instance {} started: {}", id_clone, line);
+                    }
+                }
                 let now = std::time::SystemTime::now()
                     .duration_since(std::time::UNIX_EPOCH)
                     .unwrap_or_default()
@@ -220,11 +227,6 @@ impl InstanceManager {
                     .await;
             }
             tracing::info!("instance {} stdout EOF", id_clone);
-            // 首次收到 stdout 时标记为 Running
-            let mut s = state_stdout.write().await;
-            if *s == InstanceState::Starting {
-                *s = InstanceState::Running;
-            }
         });
 
         // 启动 stderr reader task
