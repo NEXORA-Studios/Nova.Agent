@@ -348,4 +348,57 @@ impl InstanceManager {
         }
         result
     }
+
+    /// 关闭所有实例（优雅 stop，超时后 kill）
+    pub async fn shutdown_all(&self) {
+        let instances: Vec<Arc<ManagedInstance>> = {
+            let inner = self.inner.read().await;
+            inner.values().cloned().collect()
+        };
+
+        if instances.is_empty() {
+            return;
+        }
+
+        tracing::info!("shutting down {} instance(s)...", instances.len());
+
+        // 先对所有实例发送 stop
+        for inst in &instances {
+            let state = *inst.state.read().await;
+            if state == InstanceState::Running || state == InstanceState::Starting {
+                *inst.state.write().await = InstanceState::Stopping;
+                let _ = inst.send_console("stop").await;
+            }
+        }
+
+        // 等待最多 60s
+        let deadline = tokio::time::Instant::now() + Duration::from_secs(60);
+        loop {
+            let all_stopped = {
+                let inner = self.inner.read().await;
+                let mut stopped = true;
+                for inst in inner.values() {
+                    let s = *inst.state.read().await;
+                    if s != InstanceState::Stopped && s != InstanceState::Crashed {
+                        stopped = false;
+                        break;
+                    }
+                }
+                stopped
+            };
+            if all_stopped || tokio::time::Instant::now() >= deadline {
+                break;
+            }
+            tokio::time::sleep(Duration::from_millis(500)).await;
+        }
+
+        // 超时后 kill 剩余
+        for inst in &instances {
+            let state = *inst.state.read().await;
+            if state != InstanceState::Stopped && state != InstanceState::Crashed {
+                tracing::warn!("force killing instance {} on shutdown", inst.id);
+                let _ = inst.kill().await;
+            }
+        }
+    }
 }
